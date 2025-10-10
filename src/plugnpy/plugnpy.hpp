@@ -18,27 +18,34 @@ struct GilGuard {
     ~GilGuard() {PyGILState_Release(this->_state); }
 };
 
-struct PyVmMan {
+// in PyVmMan
+class PyVmMan {
+    PyThreadState* _main_tstate{nullptr};
+public:
 
-    PyVmMan(const bool start = false) {
-        if (start) { this->init(); }
-    }
-    ~PyVmMan() { this->finalize(); }
     void init() {
         if (Py_IsInitialized()) return;
         Py_Initialize();
+        // TODO: setup common libs?
+        PyEval_InitThreads();
+        _main_tstate = PyEval_SaveThread();
     }
 
     void finalize() {
         if (!Py_IsInitialized()) return;
-        {
-            GilGuard gill;
-            PyGC_Collect();
-            PyGC_Collect();
-        }
+        PyEval_RestoreThread(_main_tstate);
+        _main_tstate = nullptr;
+
+        PyGC_Collect();
+        PyGC_Collect();
         Py_FinalizeEx();
     }
+    PyVmMan(const bool start_python = false) { 
+        if (start_python) { init(); }
+    }
+    ~PyVmMan() { finalize(); }
 };
+
 
 inline std::string GetPyErrorString() {
     // basically PyErr_Print()
@@ -100,9 +107,28 @@ class PyPlugin : public std::enable_shared_from_this<PyPlugin> {
             GilGuard gil;
             this->script = script;
             try {
-                this->main = boost::python::import("__main__");
-                this->globals = boost::python::dict(this->main.attr("__dict__"));
+                // create a unique module for this plugin
+                boost::python::object importlib = boost::python::import("importlib");
+                boost::python::object types = boost::python::import("types");
+                auto modname = boost::python::str("plugin_" + name);
+
+                // new blank module
+                boost::python::object module = types.attr("ModuleType")(modname);
+
+                // provide builtins so exec has a proper environment
+                module.attr("__dict__")["__builtins__"] = boost::python::import("builtins");
+
+                this->globals = boost::python::extract<boost::python::dict>(module.attr("__dict__"));
+                // make it importable by its name (optional but handy)
+                boost::python::import("sys").attr("modules")[modname] = module;
+
+                // ensure script dir is on sys.path so relative imports work
+                boost::python::object sys = boost::python::import("sys");
+                sys.attr("path").attr("insert")(0, boost::python::str("."));
+
                 boost::python::exec_file(this->script.c_str(), this->globals, this->globals);
+                
+                this->main = module;
                 this->status = Status::RUNNING;
             }
             catch(const boost::python::error_already_set &) {
@@ -111,36 +137,55 @@ class PyPlugin : public std::enable_shared_from_this<PyPlugin> {
             }
         }
 
+        inline boost::python::object get_callable(const char *name) {
+            auto obj = this->globals.get(name);
+            if (obj.is_none())
+                throw std::runtime_error(std::string("Python function '") + name + "' not found");
+            // PyCallable_Check
+            if (!PyCallable_Check(obj.ptr()))
+                throw std::runtime_error(std::string("'") + name + "' is not callable");
+            return obj;
+        }
+
         template<typename ... Args>
         void call_void(const char *name, Args&& ... args) {
             if (!Py_IsInitialized() || this->status != Status::RUNNING) return;
             GilGuard gil;
             try {
-                boost::python::object func = this->globals.get(name);
+                auto func = get_callable(name);
                 func(std::forward<Args>(args)...);
-            }
-            catch(const boost::python::error_already_set &) {
+            } catch (const boost::python::error_already_set&) {
                 this->status = Status::ERROR;
                 std::cout << GetPyErrorString() << "\n";
+            } catch (const std::exception& ex) {
+                this->status = Status::ERROR;
+                std::cout << "C++ exception: " << ex.what() << "\n";
             }
         }
 
         template<typename T, typename ... Args>
         T call(const char *name, Args&& ... args) {
-            // TODO: need better way to handel fail state
-            // if (!Py_IsInitialized() || this->status != Status::RUNNING)
             GilGuard gil;
             try {
-                boost::python::object func = this->globals.get(name);
+                auto func = get_callable(name);
                 boost::python::object r = func(std::forward<Args>(args)...);
-                return boost::python::extract<T>(r);
-            }
-            catch(const boost::python::error_already_set &) {
+                boost::python::extract<T> conv(r);
+                if (!conv.check())
+                    throw std::runtime_error(std::string("Type conversion failed calling '") + name + "'");
+                return conv();
+            } catch (const boost::python::error_already_set&) {
                 this->status = Status::ERROR;
                 std::cout << GetPyErrorString() << "\n";
-                throw std::runtime_error("failed to get method");
+                throw std::runtime_error("failed to call method");
             }
         }
+
+        template<typename T>
+        void set_global(const char* key, const T& v) {
+            GilGuard gil;
+            this->globals[key] = v;
+        }
+
 };
 
 class PyPlugMan {
