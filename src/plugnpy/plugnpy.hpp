@@ -12,19 +12,22 @@
 #include <boost/python.hpp>
 #pragma GCC diagnostic pop
 
+#include "pymod/bpmod.hpp"
+
+
 struct GilGuard {
     PyGILState_STATE _state;
     GilGuard() : _state(PyGILState_Ensure()) {}
     ~GilGuard() {PyGILState_Release(this->_state); }
 };
 
-// in PyVmMan
+
 class PyVmMan {
     PyThreadState* _main_tstate{nullptr};
 public:
-
     void init() {
         if (Py_IsInitialized()) return;
+        init_bpmod();
         Py_Initialize();
         // TODO: setup common libs?
         PyEval_InitThreads();
