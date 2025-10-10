@@ -1,0 +1,51 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "/home/blackbox/b_1_82_0_install/include",
+                "/home/blackbox/b_1_82_0_install/lib",
+                "/home/blackbox/armadillo/install",
+                "/home/blackbox/fmt/include/fmt",
+                "/home/blackbox/fmt/include",
+                "/home/blackbox/entt/src",
+                "/home/blackbox/sol2/include",
+                "/usr/include/python3.8",
+                "/usr/include/lua5.3"
+            ],
+            "defines": [],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c17",
+            "cppStandard": "gnu++17",
+            "intelliSenseMode": "${default}",
+            "browse": {
+                "path": [
+                    "${workspaceFolder}",
+                    "/home/blackbox/b_1_82_0_install/include",
+                    "/home/blackbox/b_1_82_0_install/lib",
+                    "/home/blackbox/armadillo/install",
+                    "/home/blackbox/fmt/include/fmt",
+                    "/home/blackbox/entt/src",
+                    "/home/blackbox/sol2/include",
+                    "/usr/include/python3.8",
+                    "/usr/include/lua5.3"
+                ],
+                "limitSymbolsToIncludedHeaders": true,
+                "databaseFilename": ".vscode_db"
+            },
+            "compilerArgs": [
+                "${workspaceFolder}/**",
+                "/home/blackbox/b_1_82_0_install/include/**",
+                "/home/blackbox/b_1_82_0_install/lib/**",
+                "/home/blackbox/armadillo/install/**",
+                "/home/blackbox/fmt/include/fmt/**",
+                "/home/blackbox/entt/src/**",
+                "/home/blackbox/sol2/include/sol/**",
+                "/usr/include/lua5.3/**"
+            ],
+            "configurationProvider": "ms-vscode.makefile-tools"
+        }
+    ],
+    "version": 4
+}
