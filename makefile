@@ -22,6 +22,9 @@ LDFLAGS    +=-Wl,-rpath,$(PYTHON_LIB) -L$(PYTHON_LIB) -lpython3.8
 MAIN_TARGET_BASENAME := main
 MAIN_TARGET := $(BIN_DIR)/$(MAIN_TARGET_BASENAME).e
 
+BPMOD_TARGET_BASENAME := my_cpp_module
+BPMOD_TARGET := $(BIN_DIR)/$(BPMOD_TARGET_BASENAME).so
+
 SRC_DIRS  := $(shell find "$(MAIN_DIR)" -type d)
 OBJ_DIRS  := $(patsubst $(PROJECT_DIR)/src%,$(PROJECT_DIR)/objects/src%,$(SRC_DIRS))
 
@@ -36,10 +39,14 @@ CXXFLAGS += -I$(MAIN_DIR) -I$(BOOST_INC) -I$(PYTHON_INC)
 .PHONY: default all clean dinfo
 
 default: $(MAIN_TARGET)
-all: $(MAIN_TARGET)
+
+all: $(MAIN_TARGET) $(BPMOD_TARGET)
 
 $(MAIN_TARGET): $(OBJECTS_CPP)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
+
+$(BPMOD_TARGET): $(filter-out %main.o, $(OBJECTS_CPP))
+	$(CXX) -shared -export-dynamic $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 
 $(OBJECTS_DIR)/src/%.o: $(MAIN_DIR)/%.cpp
 	@mkdir -p "$(@D)"
@@ -55,6 +62,6 @@ dinfo:
 
 clean:
 	@echo "Cleaning build outputs…"
-	@rm -rf "$(OBJECTS_DIR)/src" "$(MAIN_TARGET)"
+	@rm -rf "$(OBJECTS_DIR)/src" "$(MAIN_TARGET)" $(BPMOD_TARGET)
 
 -include $(DEPENDENCIES)
