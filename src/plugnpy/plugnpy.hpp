@@ -5,6 +5,7 @@
 #include <iostream>
 #include <map>
 
+
 #include <Python.h>
 #define BOOST_NO_AUTO_PTR
 #pragma GCC diagnostic push
@@ -21,30 +22,24 @@ struct GilGuard {
     ~GilGuard() {PyGILState_Release(this->_state); }
 };
 
-
 class PyVmMan {
-    PyThreadState* _main_tstate{nullptr};
 public:
-    void init() {
+    void initialize() {
         if (Py_IsInitialized()) return;
         init_bpmod();
         Py_Initialize();
-        // TODO: setup common libs?
-        PyEval_InitThreads();
-        _main_tstate = PyEval_SaveThread();
     }
 
     void finalize() {
         if (!Py_IsInitialized()) return;
-        PyEval_RestoreThread(_main_tstate);
-        _main_tstate = nullptr;
-
-        PyGC_Collect();
-        PyGC_Collect();
+        {
+            GilGuard gil;
+            PyGC_Collect();
+        }
         Py_FinalizeEx();
     }
     PyVmMan(const bool start_python = false) { 
-        if (start_python) { init(); }
+        if (start_python) { initialize(); }
     }
     ~PyVmMan() { finalize(); }
 };
@@ -202,7 +197,7 @@ class PyPlugMan {
             this->_vm.finalize();
         };
         void addPlugin(const std::string &name, const std::string &script) {
-            this->_vm.init();
+            this->_vm.initialize();
             auto ins = this->plugins.emplace(name, std::make_unique<PyPlugin>(
                 name, script
             ));
@@ -220,7 +215,7 @@ class PyPlugMan {
 
         template<class T, class... Args>
         void addPluginAs(const std::string& name, Args&&... args) {
-            _vm.init();
+            _vm.initialize();
             auto up = std::make_unique<T>(name, std::forward<Args>(args)...);
             up->load();
             plugins.emplace(name, std::move(up));

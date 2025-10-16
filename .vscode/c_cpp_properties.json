@@ -12,7 +12,8 @@
                 "/home/blackbox/entt/src",
                 "/home/blackbox/sol2/include",
                 "/usr/include/python3.8",
-                "/usr/include/lua5.3"
+                "/usr/include/lua5.3",
+                "${workspaceFolder}/src"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/gcc",
